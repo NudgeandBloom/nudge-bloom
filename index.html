@@ -3,22 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Nudge &amp; Bloom — Version 3.3: Quieter Screen, Truer Voice</title>
+<title>Nudge &amp; Bloom — Version 3.5: The Decipher</title>
 <style>
   * { -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; box-sizing: border-box; outline: none; }
   html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#040406; font-family: Georgia, serif; touch-action:none; }
+  /* The Decipher: type carries the tone. Three states shift ONLY weight,
+     letter spacing, and a warm/cool tint of the locked colors. Background
+     and typeface never move. States ease over ~600ms, never snap. */
+  body { --tone-text-rgb:217,210,197; --tone-accent-rgb:240,179,94; --tone-weight:400; --tone-spacing:0.01em; }
+  body[data-tone="heavy"] { --tone-text-rgb:184,180,172; --tone-accent-rgb:215,163,89; --tone-weight:600; --tone-spacing:-0.01em; }
+  body[data-tone="warm"] { --tone-text-rgb:220,205,182; --tone-accent-rgb:240,179,94; --tone-weight:400; --tone-spacing:0.03em; }
   .scene-vid { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 1.1s ease, transform 2.6s ease, filter 2.6s ease; z-index:1; }
   .scene-vid.active { opacity:1; }
   #vid-flower.zoomed { transform:scale(1.24); filter:brightness(1.1) saturate(1.12); }
+  body.listening .scene-vid.active { transform:scale(1.05); filter:brightness(1.07) saturate(1.05); }
+  body.listening #vid-flower.zoomed { transform:scale(1.3); }
+  body.listening #hold-ring { border-color:rgba(240,179,94,0.95); box-shadow:0 0 26px rgba(240,179,94,0.55); }
   #fx { position:absolute; inset:0; width:100%; height:100%; z-index:5; pointer-events:none; }
   header { position:absolute; top:0; left:0; right:0; padding-top:26px; display:flex; flex-direction:column; align-items:center; pointer-events:none; z-index:10; text-shadow:0 1px 10px rgba(0,0,0,0.8); transition:opacity 1.6s ease; }
-  #env-kicker { font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:rgba(240,179,94,0.65); }
-  #env-name { font-size:17px; letter-spacing:0.14em; color:rgba(255,240,214,0.95); margin-top:3px; }
+  #env-kicker { font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:rgba(var(--tone-accent-rgb),0.65); transition:color 0.6s ease; }
+  #env-name { font-size:17px; letter-spacing:0.14em; color:rgba(var(--tone-text-rgb),0.95); margin-top:3px; transition:color 0.6s ease; }
   #companion-badge { font-size:9px; letter-spacing:0.25em; text-transform:uppercase; color:rgba(170,225,185,0.8); margin-top:4px; }
   #caption-stage { position:absolute; left:0; right:0; bottom:120px; padding:0 24px; display:flex; flex-direction:column; align-items:center; text-align:center; pointer-events:none; z-index:20; }
-  .spoken { animation: cheshire 6.5s cubic-bezier(0.18,0.89,0.32,1.1) forwards; text-shadow:0 0 24px rgba(255,230,180,0.35), 0 1px 8px rgba(0,0,0,0.9); font-size:16px; line-height:1.55; padding:10px 20px; border-radius:999px; max-width:560px; background:rgba(10,6,3,0.25); }
+  .spoken { animation: cheshire 6.5s cubic-bezier(0.18,0.89,0.32,1.1) forwards; text-shadow:0 0 24px rgba(255,230,180,0.35), 0 1px 8px rgba(0,0,0,0.9); font-size:16px; line-height:1.55; padding:10px 20px; border-radius:999px; max-width:560px; background:rgba(10,6,3,0.25); font-weight:var(--tone-weight); letter-spacing:var(--tone-spacing); transition:color 0.6s ease, font-weight 0.6s ease, letter-spacing 0.6s ease; }
   .spoken.her { color:rgba(233,250,238,0.97); font-style:italic; }
   .spoken.gus { color:rgba(255,224,166,0.98); }
+  body[data-tone="heavy"] .spoken.her { color:rgba(197,213,205,0.97); }
+  body[data-tone="heavy"] .spoken.gus { color:rgba(215,191,146,0.98); }
+  body[data-tone="warm"] .spoken.her { color:rgba(234,239,216,0.97); }
+  body[data-tone="warm"] .spoken.gus { color:rgba(253,217,155,0.98); }
   @keyframes cheshire {
     0% { opacity:0; transform:translateY(16px) scale(0.95); filter:blur(6px); }
     10% { opacity:0.97; transform:translateY(0) scale(1); filter:blur(0); }
@@ -33,7 +46,7 @@
   #touch-surface { position:absolute; inset:0; z-index:30; }
 </style>
 </head>
-<body>
+<body data-tone="ground">
 <!-- The living scenes. On GitHub, each video file sits beside this page and the
      links below can be swapped for the plain file names. -->
 <video id="vid-flower" class="scene-vid active" muted loop playsinline preload="auto" poster="flower-poster.webp" src="flower.mp4"></video>
@@ -208,13 +221,59 @@ const GUS = {
   }
 };
 
-/* ---------------- Voice ---------------- */
+/* ---------------- The Decipher: tone states ----------------
+   The tone palette sheet, wired in. Three states - ground, heavy,
+   warm - picked from the words themselves, per the sheet's guide:
+   plain settled conversation stays ground; sad, heavy, scared, or
+   crisis-adjacent words go heavy; wins, warmth, and relief go warm;
+   when unsure, it stays ground. A state moves ONLY type weight,
+   letter spacing, and a warm/cool tint of the locked colors (the
+   CSS variables on the body, plus the steam colors in this table).
+   Background, typeface, and every behavior stay exactly as built. */
+const TONES = {
+  ground: { weight:400, spacing:0.01, gus:[255,235,205], user:[232,184,75] },
+  heavy:  { weight:600, spacing:-0.01, gus:[215,200,178], user:[196,158,72] },
+  warm:   { weight:400, spacing:0.03, gus:[253,227,188], user:[233,183,78] }
+};
+let toneState = "ground";
+function setTone(state){
+  toneState = TONES[state] ? state : "ground";
+  document.body.dataset.tone = toneState;
+}
+const TONE_HEAVY_KEYS = ["sad","grief","cry","hurt","heavy","miss","lonely","alone","angry","mad","furious","hate","anxious","anxiety","worried","worry","stress","overwhelmed","panic","scared","afraid","tired","exhausted","broke","money","bill","rent","debt","winter","cold","freeze","breakup","broke up","she left","divorce","moving","pain","sick"];
+const TONE_WARM_KEYS = ["happy","glad","great","better","won","did it","proud","launched","posted","finished","built it","worked","relief","relieved","thank","love","hope","good news","warm"];
+function toneFor(text){
+  const t = " " + String(text).toLowerCase() + " ";
+  if (CRISIS_WORDS.some(k => t.includes(k))) return "heavy";
+  if (TONE_HEAVY_KEYS.some(k => t.includes(k))) return "heavy";
+  if (TONE_WARM_KEYS.some(k => t.includes(k))) return "warm";
+  return "ground";
+}
+
+/* ---------------- Voice ----------------
+   Sharpening rule 1: speech engines stay locked until the first touch.
+   The first touch warms the engine on a silent breath; if the opening
+   greeting was waiting, it speaks then. A voice line never dies
+   silently - if the engine fails, a tone answers instead. */
 let voiceOn = true;
+let audioUnlocked = false, pendingLine = null;
+function primeVoices(){ if ("speechSynthesis" in window) { try { speechSynthesis.getVoices(); } catch(e) {} } }
+if ("speechSynthesis" in window) { primeVoices(); try { speechSynthesis.onvoiceschanged = primeVoices; } catch(e) {} }
+function unlockAudio(){
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  if ("speechSynthesis" in window) {
+    try { const warm = new SpeechSynthesisUtterance(" "); warm.volume = 0; speechSynthesis.speak(warm); } catch(e) {}
+  }
+  if (pendingLine) { const p = pendingLine; pendingLine = null; setTimeout(() => speak(p.text, p.who), 80); }
+}
 function speak(text, who){
+  setTone(toneFor(text));
   showCaption(text, who);
-  feedSteam(text, who);
+  if (scene === "bench") feedSteam(text, who);
   if (!voiceOn) return;
-  if (!("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) { tone(430, 0.22); return; }
+  if (!audioUnlocked) { pendingLine = { text, who }; return; }
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
@@ -228,8 +287,9 @@ function speak(text, who){
       if (f) u.voice = f;
       u.pitch = 0.98; u.rate = 0.93;
     }
+    u.onerror = () => tone(300, 0.2);
     speechSynthesis.speak(u);
-  } catch(e) {}
+  } catch(e) { tone(300, 0.2); }
 }
 function showCaption(text, who){
   const stage = document.getElementById("caption-stage");
@@ -242,18 +302,26 @@ function showCaption(text, who){
   stage.appendChild(p);
   setTimeout(() => { if (p.parentNode) p.parentNode.removeChild(p); }, ms);
 }
-let recognizer = null;
+let recognizer = null, awaitingResult = false, missTimer = null;
+function feltMiss(){
+  awaitingResult = false;
+  if (missTimer) { clearTimeout(missTimer); missTimer = null; }
+  tone(300, 0.25);
+  showCaption(pick(scene === "bench" ? GUS_PRESENCE : HER_PRESENCE), scene === "bench" ? "gus" : "her");
+}
 (function(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return;
   recognizer = new SR();
   recognizer.continuous = false; recognizer.interimResults = false; recognizer.lang = "en-US";
-  recognizer.onresult = e => { handleSpoken(e.results[0][0].transcript); };
-  recognizer.onerror = () => {};
+  recognizer.onresult = e => { awaitingResult = false; if (missTimer) { clearTimeout(missTimer); missTimer = null; } handleSpoken(e.results[0][0].transcript); };
+  recognizer.onerror = () => feltMiss();
 })();
 function handleSpoken(text){
   if (!text || !text.trim()) return;
+  setTone(toneFor(text));
   memory.push(text.trim());
+  if (scene === "bench") feedSteam(text.trim(), "user");
   if (scene === "bench") speak(GUS.respond(text), "gus");
   else {
     let reply = HER.respond(text);
@@ -319,12 +387,25 @@ function tone(freq, dur){
 const motes = Array.from({length:40}, () => ({ x:Math.random(), y:Math.random(), s:Math.random()*2+0.7, vy:-(Math.random()*0.0008+0.0003), vx:(Math.random()-0.5)*0.0003, ph:Math.random()*6.28 }));
 const steamWords = [];
 function feedSteam(text, who){
-  if (who !== "gus") return;
+  /* Sharpening rule 3: the steam carries BOTH voices at the Bench -
+     the words spoken here join the words answered back. */
   text.split(/\s+/).slice(0, 26).forEach((w, i) => {
-    steamWords.push({ w, x: 0.5 + (Math.random()-0.5)*0.22, y: 0.60, a: 0, delay: i*7, vy: 0.0011 + Math.random()*0.0007 });
+    steamWords.push({ w, who, x: 0.5 + (Math.random()-0.5)*0.22, y: 0.60, a: 0, delay: i*7, vy: 0.0011 + Math.random()*0.0007 });
   });
 }
 let bursts = [], ripples = [], zenStrokes = [], zenCurrent = null, userStars = [];
+/* Sharpening rule 4: drifting between atmospheres bursts glitter -
+   little square pixels of amber and gold that hang, twinkle, and fall. */
+let glitters = [];
+function glitterBurst(n){
+  const cols = ["255,205,110","240,179,94","255,240,205","218,165,32"];
+  for (let i = 0; i < (n || 130); i++) {
+    glitters.push({ x: Math.random()*W, y: Math.random()*H, s: Math.random()*5 + 2,
+      vx: (Math.random()-0.5)*0.7, vy: Math.random()*1.1 + 0.25,
+      life: 1, decay: Math.random()*0.011 + 0.007, ph: Math.random()*6.28,
+      rot: Math.random()*3.14, c: cols[Math.floor(Math.random()*cols.length)] });
+  }
+}
 function fxLoop(){
   T += 0.016;
   fxCtx.clearRect(0, 0, W, H);
@@ -335,6 +416,16 @@ function fxLoop(){
     const o = 0.28 + Math.sin(m.ph)*0.22;
     fxCtx.beginPath(); fxCtx.arc(m.x*W, m.y*H, m.s, 0, 6.283);
     fxCtx.fillStyle = "rgba(245,200,100," + o.toFixed(2) + ")"; fxCtx.fill();
+  });
+  glitters = glitters.filter(g => g.life > 0);
+  glitters.forEach(g => {
+    g.x += g.vx; g.y += g.vy; g.life -= g.decay; g.rot += 0.03;
+    const tw = 0.55 + Math.sin(T*9 + g.ph)*0.45;
+    fxCtx.save(); fxCtx.globalAlpha = Math.max(g.life * tw, 0);
+    fxCtx.translate(g.x, g.y); fxCtx.rotate(g.rot);
+    fxCtx.fillStyle = "rgba(" + g.c + ",1)";
+    fxCtx.fillRect(-g.s/2, -g.s/2, g.s, g.s);
+    fxCtx.restore();
   });
   if (scene === "door" || scene === "flower") {
     bursts = bursts.filter(b => b.life > 0);
@@ -359,13 +450,16 @@ function fxLoop(){
       fxCtx.beginPath(); fxCtx.arc(s.x, s.y, 7, 0, 6.283); fxCtx.fillStyle = "rgba(255,220,160," + (tw*0.14) + ")"; fxCtx.fill(); });
   }
   if (scene === "bench") {
+    const tone = TONES[toneState] || TONES.ground;
     steamWords.forEach(s => {
       if (s.delay > 0) { s.delay--; return; }
       s.y -= s.vy; s.a = Math.min(s.a + 0.012, 0.5);
       const fade = s.y < 0.30 ? Math.max((s.y - 0.16)/0.14, 0) : 1;
-      fxCtx.font = "italic " + Math.round(W*0.036) + "px Georgia"; fxCtx.textAlign = "center";
+      fxCtx.font = "italic " + tone.weight + " " + Math.round(W*0.05) + "px Georgia"; fxCtx.textAlign = "center";
+      try { fxCtx.letterSpacing = (tone.spacing * W * 0.05).toFixed(1) + "px"; } catch(e) {}
       fxCtx.shadowColor = "rgba(0,0,0,0.9)"; fxCtx.shadowBlur = 7;
-      fxCtx.fillStyle = "rgba(255,235,205," + (s.a * fade) + ")";
+      const rgb = s.who === "user" ? tone.user : tone.gus;
+      fxCtx.fillStyle = "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + (s.a * fade) + ")";
       fxCtx.fillText(s.w, s.x*W + Math.sin(T*1.4 + s.y*22)*5, s.y*H);
       fxCtx.shadowBlur = 0;
     });
@@ -416,7 +510,9 @@ const GUS_PRESENCE = [
 ];
 const entered = {};
 function goScene(next){
+  const changed = scene !== next;
   scene = next; manageAssets(); stageVideo(); setHeader();
+  if (changed) glitterBurst(140);
   if (next === "bench") setTimeout(() => speak(pick(GUS_DOOR), "gus"), 500);
   else if (next !== "door" && !entered[next]) { entered[next] = true; setTimeout(() => speak(HER.worldLine[next] || "", "her"), 550); }
 }
@@ -425,7 +521,7 @@ function navigate(dx, dy){
   if (scene === "door") {
     if (dy < -45) { worldIndex = WORLDS.findIndex(w => w.id === WORLDS[worldIndex].id); goScene(WORLDS[worldIndex].id); }
     else if (dy > 45) goScene("bench");
-    else if (Math.abs(dx) > 45) { worldIndex = (worldIndex + (dx < 0 ? 1 : -1) + WORLDS.length) % WORLDS.length; setHeader(); }
+    else if (Math.abs(dx) > 45) { worldIndex = (worldIndex + (dx < 0 ? 1 : -1) + WORLDS.length) % WORLDS.length; setHeader(); glitterBurst(60); }
   } else if (scene === "bench") {
     if (dy < -45) goScene("door");
   } else {
@@ -449,6 +545,7 @@ const surface = document.getElementById("touch-surface");
 let pDown = false, startX = 0, startY = 0, lastX = 0, lastY = 0, holding = false, holdTimer = null, swiping = false, downAt = 0;
 let lastTapAt = 0, lastTapX = 0, lastTapY = 0;
 surface.addEventListener("pointerdown", e => {
+  unlockAudio();
   ensurePlay();
   pDown = true; swiping = false; holding = false; downAt = Date.now();
   startX = e.clientX; startY = e.clientY; lastX = startX; lastY = startY;
@@ -460,6 +557,7 @@ surface.addEventListener("pointerdown", e => {
     if (swiping) return;
     if (Math.hypot(lastX - startX, lastY - startY) > 12) return;
     holding = true; coreEl.style.transform = "scale(2.3)"; tone(320, 0.3);
+    document.body.classList.add("listening");
     if (recognizer) { try { recognizer.start(); } catch(err) {} }
   }, 380);
 });
@@ -476,7 +574,13 @@ surface.addEventListener("pointerup", e => {
   if (scene === "zen" && zenCurrent) { if (zenCurrent.length > 3) zenStrokes.push(zenCurrent); if (zenStrokes.length > 14) zenStrokes.shift(); zenCurrent = null; }
   if (holding) {
     holding = false; coreEl.style.transform = "scale(1)";
-    if (recognizer) { try { recognizer.stop(); } catch(err) {} }
+    document.body.classList.remove("listening");
+    tone(210, 0.2);
+    if (recognizer) {
+      awaitingResult = true;
+      try { recognizer.stop(); } catch(err) {}
+      missTimer = setTimeout(() => { if (awaitingResult) feltMiss(); }, 1500);
+    }
     else speak(pick(scene === "bench" ? GUS_PRESENCE : HER_PRESENCE), scene === "bench" ? "gus" : "her");
   } else if (swiping && (Math.abs(dx) > 45 || Math.abs(dy) > 45)) navigate(dx, dy);
   else if (Date.now() - downAt < 300) {
@@ -493,7 +597,7 @@ surface.addEventListener("pointerup", e => {
     } else { lastTapAt = now; lastTapX = e.clientX; lastTapY = e.clientY; tapAt(e.clientX, e.clientY); }
   }
 });
-surface.addEventListener("pointercancel", () => { clearTimeout(holdTimer); pDown = false; holding = false; zenCurrent = null; coreEl.style.transform = "scale(1)"; });
+surface.addEventListener("pointercancel", () => { clearTimeout(holdTimer); pDown = false; holding = false; awaitingResult = false; zenCurrent = null; coreEl.style.transform = "scale(1)"; document.body.classList.remove("listening"); });
 
 /* ---------------- Open the door ---------------- */
 manageAssets();
