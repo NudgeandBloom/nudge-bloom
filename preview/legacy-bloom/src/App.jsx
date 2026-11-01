@@ -5,10 +5,10 @@ import BenchGus from './components/BenchGus.jsx'
 import SettingsModal from './components/SettingsModal.jsx'
 
 const SANCTUARIES = [
-  { id: 'flower', label: 'Flower Garden', video: '/assets/video/flower_loop.mp4' },
-  { id: 'ocean', label: 'Ocean Drift', video: '/assets/video/ocean_ambient.mp4' },
-  { id: 'zen', label: 'Zen Garden', video: '/assets/video/zen_garden.mp4' },
-  { id: 'celestial', label: 'Celestial', video: '/assets/video/celestial_sky.mp4' },
+  { id: 'flower', label: 'Flower Garden', video: '/flower.mp4', poster: '/flower-poster.webp' },
+  { id: 'ocean', label: 'Ocean Drift', video: '/ocean.mp4', poster: '/ocean-poster.webp' },
+  { id: 'zen', label: 'Zen Garden', video: '/zen.mp4', poster: '/zen-poster.webp' },
+  { id: 'celestial', label: 'Celestial', video: '/celestial.mp4', poster: '/celestial-poster.webp' },
 ]
 
 // Screens: 'door' -> 'sanctuary' (swipe through SANCTUARIES) -> 'bench' (swipe down)
@@ -80,6 +80,7 @@ export default function App() {
             <video
               key={current.id}
               src={current.video}
+              poster={current.poster}
               autoPlay
               loop
               muted
@@ -155,7 +156,8 @@ export default function App() {
         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
           {settings.videosEnabled && (
             <video
-              src="/assets/video/bench_scene_2.1.mp4"
+              src="/bench.mp4"
+              poster="/bench-poster.webp"
               autoPlay
               loop
               muted
