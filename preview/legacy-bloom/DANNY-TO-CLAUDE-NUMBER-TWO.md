@@ -69,3 +69,16 @@ THE BENCH RULES, in short:
 - Vent, hit stop or go silent 8-10 seconds, he replies with a prompt, not cushy empathy.
 - Leave it all at the Bench. Words dissipate into the Cheshire Cat and steam. You feel better, you leave. It automatically remembers.
 - Three nudges a day: morning, noon, and evening. It does not remind you, it gives you a nudge. That needs to be in there big time.
+
+---
+
+ADDENDUM 2 — The real Gus vs. the recordings, Nov 1, 2026
+
+Danny: Yes, yes. The recordings is all the stuff for the fucking Gumroad thing. The real Gus I must pull out for you, I guess.
+
+So, in Danny's words, for Claude:
+- The recordings — the MP3s, the cue cards, the Session Zero lines — are all for the Gumroad thing. That is the vault, the YouTube stuff. That is NOT the app Gus.
+- The real Gus is the one Danny can pull out of Gems, or out of one of his Google accounts, and have a conversation with forever. He will keep talking, and have different lines, and agility.
+- When Gus is in this app, he has nothing. Not a word.
+- Gus in the app has to talk like Gus in the Gem — forever, different lines, agile — not a word less. The app needs the live Gus, not the recording stack.
+- Danny will pull the real Gus out for us. Do not build the app Gus from the recordings.
