@@ -1,49 +1,142 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 /**
  * BenchGus — Gus at the counter, Bench only.
- * Audio is STUBBED per spec: Danny hasn't cleared live voice assets yet.
- * This drives a mock playback state machine (isPlaying, currentLine,
- * toggleAudio) against plain text scripts, so the component structure
- * is ready to wire real audio in later without changing its shape.
+ *
+ * Step 3 of NEXT-BUILD-SEQUENCE.md: autonomous silence detection wired
+ * to the Bench client view. No hold-to-talk (traps on Chromebook via
+ * right-click), no "type here" text fallback — both are hard
+ * prohibitions in MODULE-SPEC-THE-BENCH-RUNTIME.md.
+ *
+ * What's real here: the mic listens on its own the moment the Bench
+ * opens. Web Audio API measures live volume every frame. Once you've
+ * spoken and then gone quiet for 8-10s, Gus answers automatically —
+ * no button, no hold, no typing.
+ *
+ * What's still stubbed: there's no live model or ElevenLabs voice
+ * wired in yet (RUNTIME-SPEC-v1.md Section 3/4 needs real API keys
+ * Danny/Jett have to supply). So "Gus answers" here just advances to
+ * the next canned line as a placeholder — the INPUT side (silence
+ * detection replacing hold-to-talk) is the real, functioning part of
+ * this step. Swapping the stubbed reply for a real model call is a
+ * drop-in change once keys exist — this component doesn't need to
+ * change shape for that.
  */
 
-// Canonical Gus lines — short-order cook, counter warmth, plain talk,
-// zero cheerleading. Never "I totally understand."
+const SILENCE_THRESHOLD_MS = 9000 // mid-point of the 8.0-10.0s spec range
+const VOICE_RMS_THRESHOLD = 0.02 // rough mic-noise floor; needs real-device tuning
+
 const GUS_LINES = [
-  { id: 'greet', text: "Pull up a stool. Coffee's fresh." },
+  { id: 'greet', text: "Do you leave it all here, or we can talk you through it?" },
   { id: 'circuit-breaker', text: "Step off the gas a second. Cut the power to the loop." },
   { id: 'ledger', text: "Whatever score you're keeping tonight, close the book. It can sit quiet till morning." },
   { id: 'cold-coffee', text: "Burnout's not a fuse blowing. It's walking away from yourself till you go cold." },
 ]
 
 export default function BenchGus({ audioEnabled = true }) {
-  const [currentLineId, setCurrentLineId] = useState(GUS_LINES[0].id)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const stubTimer = useRef(null)
+  // mic lifecycle: idle -> listening, or denied / unsupported if it can't start
+  const [micStatus, setMicStatus] = useState('idle')
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [gusState, setGusState] = useState('waiting') // waiting | replying
+  const [lineIndex, setLineIndex] = useState(0)
+  const [retryTick, setRetryTick] = useState(0)
 
-  const currentLine = GUS_LINES.find((l) => l.id === currentLineId) ?? GUS_LINES[0]
+  const audioCtxRef = useRef(null)
+  const streamRef = useRef(null)
+  const rafRef = useRef(null)
+  const lastSpeechAtRef = useRef(null)
+  const hasSpokenRef = useRef(false)
+  const busyRef = useRef(false)
 
-  // Mock playback — no audio file wired yet. Simulates a line "playing"
-  // for a few seconds so the UI state machine is exercised end to end.
-  const toggleAudio = useCallback(() => {
-    if (!audioEnabled) return
-    if (isPlaying) {
-      setIsPlaying(false)
-      if (stubTimer.current) clearTimeout(stubTimer.current)
-      return
-    }
-    setIsPlaying(true)
-    stubTimer.current = window.setTimeout(() => {
-      setIsPlaying(false)
+  const currentLine = GUS_LINES[lineIndex] ?? GUS_LINES[0]
+
+  const triggerReply = useCallback(() => {
+    busyRef.current = true
+    hasSpokenRef.current = false
+    lastSpeechAtRef.current = null
+    setGusState('replying')
+    setLineIndex((i) => (i + 1) % GUS_LINES.length)
+    window.setTimeout(() => {
+      busyRef.current = false
+      setGusState('waiting')
     }, 2600)
-  }, [isPlaying, audioEnabled])
-
-  const selectLine = useCallback((id) => {
-    setIsPlaying(false)
-    if (stubTimer.current) clearTimeout(stubTimer.current)
-    setCurrentLineId(id)
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function startListening() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMicStatus('unsupported')
+        return
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        streamRef.current = stream
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext
+        const ctx = new AudioCtx()
+        audioCtxRef.current = ctx
+        const source = ctx.createMediaStreamSource(stream)
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 512
+        source.connect(analyser)
+
+        setMicStatus('listening')
+
+        const data = new Float32Array(analyser.fftSize)
+        const tick = () => {
+          analyser.getFloatTimeDomainData(data)
+          let sumSquares = 0
+          for (let i = 0; i < data.length; i++) sumSquares += data[i] * data[i]
+          const rms = Math.sqrt(sumSquares / data.length)
+          const now = performance.now()
+
+          if (rms > VOICE_RMS_THRESHOLD) {
+            setIsSpeaking(true)
+            hasSpokenRef.current = true
+            lastSpeechAtRef.current = now
+          } else {
+            setIsSpeaking(false)
+            if (
+              !busyRef.current &&
+              hasSpokenRef.current &&
+              lastSpeechAtRef.current !== null &&
+              now - lastSpeechAtRef.current >= SILENCE_THRESHOLD_MS
+            ) {
+              triggerReply()
+            }
+          }
+          rafRef.current = requestAnimationFrame(tick)
+        }
+        rafRef.current = requestAnimationFrame(tick)
+      } catch (err) {
+        setMicStatus('denied')
+      }
+    }
+
+    startListening()
+
+    return () => {
+      cancelled = true
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop())
+      if (audioCtxRef.current) audioCtxRef.current.close()
+    }
+    // retryTick lets the "allow microphone" retry button re-run this effect
+  }, [triggerReply, retryTick])
+
+  const statusLine = (() => {
+    if (micStatus === 'unsupported') return "This browser can't take mic input here."
+    if (micStatus === 'denied') return 'Microphone access is off — Gus needs it to hear you at the Bench.'
+    if (gusState === 'replying') return 'Gus is answering.'
+    if (isSpeaking) return 'Go on — Gus is listening.'
+    return "Gus is listening. Talk when you're ready."
+  })()
 
   return (
     <div
@@ -81,48 +174,50 @@ export default function BenchGus({ audioEnabled = true }) {
         </p>
         {!audioEnabled && (
           <p style={{ margin: '8px 0 0', fontSize: 12, opacity: 0.5 }}>
-            Voice is off in Settings — text only.
+            Voice is off in Settings — text only, no sound yet either way.
           </p>
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-        {GUS_LINES.map((line) => (
-          <button
-            key={line.id}
-            onClick={() => selectLine(line.id)}
+      {/* Autonomous listening indicator — no button, nothing to hold.
+          A soft amber pulse, not a camera-style record light. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {(micStatus === 'listening') && (
+          <span
+            aria-hidden="true"
             style={{
-              background: line.id === currentLineId ? '#F0B35E' : 'transparent',
-              color: line.id === currentLineId ? '#1F2A38' : '#F0B35E',
-              border: '1px solid rgba(240,179,94,0.4)',
-              borderRadius: 999,
-              padding: '6px 12px',
-              fontSize: 12,
-              cursor: 'pointer',
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              background: '#F0B35E',
+              opacity: isSpeaking ? 1 : 0.35,
+              boxShadow: isSpeaking ? '0 0 10px 3px rgba(240,179,94,0.6)' : 'none',
+              transition: 'opacity 150ms ease, box-shadow 150ms ease',
+              flexShrink: 0,
             }}
-          >
-            {line.id.replace('-', ' ')}
-          </button>
-        ))}
+          />
+        )}
+        <p style={{ margin: 0, fontSize: 13, opacity: 0.75 }}>{statusLine}</p>
       </div>
 
-      <button
-        onClick={toggleAudio}
-        disabled={!audioEnabled}
-        style={{
-          alignSelf: 'flex-start',
-          background: isPlaying ? '#F0B35E' : 'transparent',
-          color: isPlaying ? '#1F2A38' : '#F0B35E',
-          border: '1px solid #F0B35E',
-          borderRadius: 8,
-          padding: '10px 16px',
-          fontSize: 14,
-          cursor: audioEnabled ? 'pointer' : 'not-allowed',
-          opacity: audioEnabled ? 1 : 0.4,
-        }}
-      >
-        {isPlaying ? 'Playing…' : 'Play line (stub)'}
-      </button>
+      {micStatus === 'denied' && (
+        <button
+          onClick={() => setRetryTick((n) => n + 1)}
+          style={{
+            alignSelf: 'flex-start',
+            marginTop: 12,
+            background: 'transparent',
+            color: '#F0B35E',
+            border: '1px solid #F0B35E',
+            borderRadius: 8,
+            padding: '8px 14px',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Allow microphone
+        </button>
+      )}
     </div>
   )
 }
