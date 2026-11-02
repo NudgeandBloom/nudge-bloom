@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { Settings } from 'lucide-react'
 import BloomCore from './components/BloomCore.jsx'
+import CompanionSelect from './components/CompanionSelect.jsx'
 import BenchGus from './components/BenchGus.jsx'
 import SettingsModal from './components/SettingsModal.jsx'
 
@@ -11,9 +12,43 @@ const SANCTUARIES = [
   { id: 'celestial', label: 'Celestial', video: '/celestial.mp4', poster: '/celestial-poster.webp' },
 ]
 
+const COMPANION_STORAGE_KEY = 'nb-companion-v1'
+
+// Minimal stand-in for the "local client SQLite/IndexedDB" persistence
+// RUNTIME-SPEC-v1.md calls for. This is just localStorage — enough to
+// prove the lock sticks across a reload. Swapping it for a real
+// IndexedDB/SQLite store later doesn't change anything that reads
+// `companion` from App's state.
+function readStoredCompanion() {
+  try {
+    const v = window.localStorage.getItem(COMPANION_STORAGE_KEY)
+    return v === 'GUS' || v === 'JUNE' ? v : null
+  } catch {
+    return null
+  }
+}
+
+function storeCompanion(id) {
+  try {
+    window.localStorage.setItem(COMPANION_STORAGE_KEY, id)
+  } catch {
+    // best-effort only — private mode / storage blocked shouldn't crash the app
+  }
+}
+
+const GREETING = {
+  GUS: "Alright. Grab a stool. What's going on today?",
+  JUNE: 'Alright. We’re here. What’s the rhythm today?',
+}
+
 // Screens: 'door' -> 'sanctuary' (swipe through SANCTUARIES) -> 'bench' (swipe down)
 export default function App() {
-  const [screen, setScreen] = useState('door')
+  const [companion, setCompanion] = useState(() => readStoredCompanion())
+  // Returning session with a companion already locked skips the door
+  // entirely — per UI-SPEC-COMPANION-SELECTION-STAGE.md: immutable per
+  // active profile, zero re-entry.
+  const [screen, setScreen] = useState(() => (readStoredCompanion() ? 'sanctuary' : 'door'))
+  const [greeting, setGreeting] = useState(null)
   const [sanctuaryIndex, setSanctuaryIndex] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settings, setSettings] = useState({
@@ -23,8 +58,12 @@ export default function App() {
     textSize: 'md',
   })
 
-  const handleBloom = useCallback(() => {
+  const handleLock = useCallback((id) => {
+    setCompanion(id)
+    storeCompanion(id)
+    setGreeting(GREETING[id])
     setScreen('sanctuary')
+    window.setTimeout(() => setGreeting(null), 2600)
   }, [])
 
   const goToSanctuary = (dir) => {
@@ -71,7 +110,22 @@ export default function App() {
       </button>
 
       {screen === 'door' && (
-        <BloomCore onBloom={handleBloom} reduceMotion={settings.reduceMotion} />
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <BloomCore reduceMotion={settings.reduceMotion} />
+          </div>
+          {/* Companion select, directly beneath the bloom */}
+          <div style={{ paddingBottom: '10%' }}>
+            <CompanionSelect onLock={handleLock} />
+          </div>
+        </div>
       )}
 
       {screen === 'sanctuary' && (
@@ -98,6 +152,35 @@ export default function App() {
                 e.currentTarget.style.display = 'none'
               }}
             />
+          )}
+
+          {greeting && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '18%',
+                left: 0,
+                width: '100%',
+                textAlign: 'center',
+                padding: '0 24px',
+                boxSizing: 'border-box',
+                pointerEvents: 'none',
+                zIndex: 5,
+              }}
+            >
+              <span
+                style={{
+                  color: '#F5E6D0',
+                  fontFamily: 'system-ui, sans-serif',
+                  fontSize: 17,
+                  background: 'rgba(15,13,10,0.55)',
+                  padding: '10px 16px',
+                  borderRadius: 10,
+                }}
+              >
+                {greeting}
+              </span>
+            </div>
           )}
 
           <div
@@ -146,7 +229,7 @@ export default function App() {
                 cursor: 'pointer',
               }}
             >
-              ↓ swipe down to Gus
+              ↓ swipe down to the Bench
             </button>
           </div>
         </div>
@@ -176,7 +259,7 @@ export default function App() {
             />
           )}
           <div style={{ position: 'absolute', inset: 0 }}>
-            <BenchGus audioEnabled={settings.audioEnabled} />
+            <BenchGus audioEnabled={settings.audioEnabled} companion={companion ?? 'GUS'} />
           </div>
           <button
             onClick={() => setScreen('sanctuary')}

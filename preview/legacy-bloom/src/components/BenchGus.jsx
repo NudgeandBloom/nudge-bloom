@@ -8,6 +8,14 @@ import { useState, useEffect, useRef, useCallback } from 'react'
  * right-click), no "type here" text fallback — both are hard
  * prohibitions in MODULE-SPEC-THE-BENCH-RUNTIME.md.
  *
+ * Step 2 addition: the `companion` prop (locked at the door via
+ * CompanionSelect) actually changes which persona answers here — Gus's
+ * diner-counter lines or June's grounded-warmth lines, per their role
+ * cards in RUNTIME-SPEC-v1.md Section 4. A locked choice that didn't
+ * change anything downstream would just be cosmetic, so this is that
+ * wiring, even though it's still the stubbed-reply layer, not a live
+ * model.
+ *
  * What's real here: the mic listens on its own the moment the Bench
  * opens. Web Audio API measures live volume every frame. Once you've
  * spoken and then gone quiet for 8-10s, Gus answers automatically —
@@ -33,7 +41,18 @@ const GUS_LINES = [
   { id: 'cold-coffee', text: "Burnout's not a fuse blowing. It's walking away from yourself till you go cold." },
 ]
 
-export default function BenchGus({ audioEnabled = true }) {
+// June — grounded warmth, calm cadence, crisp articulation. Never
+// synthetic, preachy, or bubbly. Same structure as Gus's lines so the
+// Bench runtime logic doesn't care which persona is active.
+const JUNE_LINES = [
+  { id: 'greet', text: 'You can leave it here, or we can sit with it together.' },
+  { id: 'circuit-breaker', text: "Let's slow that down a second. You don't have to carry all of it at once." },
+  { id: 'ledger', text: "Whatever you're keeping count of tonight, set it down. It'll still be there in the morning." },
+  { id: 'cold-coffee', text: "Burning out isn't one big break. It's the quiet walking away from yourself, bit by bit." },
+]
+
+export default function BenchGus({ audioEnabled = true, companion = 'GUS' }) {
+  const LINES = companion === 'JUNE' ? JUNE_LINES : GUS_LINES
   // mic lifecycle: idle -> listening, or denied / unsupported if it can't start
   const [micStatus, setMicStatus] = useState('idle')
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -48,14 +67,14 @@ export default function BenchGus({ audioEnabled = true }) {
   const hasSpokenRef = useRef(false)
   const busyRef = useRef(false)
 
-  const currentLine = GUS_LINES[lineIndex] ?? GUS_LINES[0]
+  const currentLine = LINES[lineIndex] ?? LINES[0]
 
   const triggerReply = useCallback(() => {
     busyRef.current = true
     hasSpokenRef.current = false
     lastSpeechAtRef.current = null
     setGusState('replying')
-    setLineIndex((i) => (i + 1) % GUS_LINES.length)
+    setLineIndex((i) => (i + 1) % LINES.length)
     window.setTimeout(() => {
       busyRef.current = false
       setGusState('waiting')
