@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 
 /**
  * BloomCore — the flower door.
@@ -16,13 +16,70 @@ import { useRef, useEffect } from 'react'
  * sits beneath it (NEXT-BUILD-SEQUENCE.md Step 2: "directly beneath
  * the bloom").
  *
- * Reskinned to match Danny's desert-poppy reference photo (color/glow
- * only — still 9 procedurally-drawn petals, no video asset, no change
- * to the breathing math): pale-gold-to-rust petal gradient, rim-light
- * glow, rust vein line per petal, amber backlight haze, a ring of
- * golden stamen filaments, and an olive-brown seed-pod core.
+ * Changed again, Nov 2 2026 — Danny's call, made with Jett: the opening
+ * is now the real desert-poppy video (public/poppy-bloom.mp4), not a
+ * drawing. This supersedes RUNTIME-SPEC-v1.md's "zero flat MP4 loops"
+ * line for this one screen — that doc still needs updating to match,
+ * flagged separately, not fixed here since this file isn't the spec.
+ *
+ * To avoid the hard jump-cut a straight loop would have, the shipped
+ * clip is pre-built as a forward+reverse "breathe" loop (bloom open,
+ * then gently close, then open again) — see public/README or ask
+ * Claude/Jett for the ffmpeg steps that built it from Danny's source
+ * clip. Playback here is plain <video autoPlay loop muted playsInline>,
+ * same pattern App.jsx already uses for the four sanctuary videos.
+ *
+ * Accessibility: reduceMotion shows the static poster frame instead of
+ * playing the video — no motion, same art.
+ *
+ * Resilience: the procedural canvas bloom from the previous step (the
+ * poppy-colored reskin: gradient petals, rim glow, stamens, seed-pod
+ * core) is kept as a fallback. If the video 404s or fails to decode,
+ * this draws that instead of leaving a blank dark panel, matching how
+ * the rest of the app fails silently on a missing asset rather than
+ * breaking.
  */
 export default function BloomCore({ reduceMotion = false }) {
+  const [videoFailed, setVideoFailed] = useState(false)
+
+  if (videoFailed) {
+    return <ProceduralFallback reduceMotion={reduceMotion} />
+  }
+
+  if (reduceMotion) {
+    return (
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <img
+          src="/poppy-bloom-poster.webp"
+          alt=""
+          style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={() => setVideoFailed(true)}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <video
+        src="/poppy-bloom.mp4"
+        poster="/poppy-bloom-poster.webp"
+        autoPlay
+        loop
+        muted
+        playsInline
+        style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
+        onError={() => setVideoFailed(true)}
+      />
+    </div>
+  )
+}
+
+/**
+ * The pre-Nov-2 procedural bloom, unchanged, kept only as the
+ * video's fallback (see file header). Not used on the happy path.
+ */
+function ProceduralFallback({ reduceMotion }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
