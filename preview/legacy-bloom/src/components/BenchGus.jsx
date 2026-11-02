@@ -44,11 +44,14 @@ const GUS_LINES = [
 // June — grounded warmth, calm cadence, crisp articulation. Never
 // synthetic, preachy, or bubbly. Same structure as Gus's lines so the
 // Bench runtime logic doesn't care which persona is active.
+// Danny's own first-pass words for how June (modeled on Michele) would
+// talk to someone having a rough night, Nov 1, 2026 — not a final
+// polish from Michele herself yet, but his real words, not Claude's.
 const JUNE_LINES = [
-  { id: 'greet', text: 'You can leave it here, or we can sit with it together.' },
-  { id: 'circuit-breaker', text: "Let's slow that down a second. You don't have to carry all of it at once." },
-  { id: 'ledger', text: "Whatever you're keeping count of tonight, set it down. It'll still be there in the morning." },
-  { id: 'cold-coffee', text: "Burning out isn't one big break. It's the quiet walking away from yourself, bit by bit." },
+  { id: 'greet', text: "Hey, you made it. Sit down, let's just breathe a minute." },
+  { id: 'circuit-breaker', text: "You don't have to fix it tonight. Just tell me what's heavy." },
+  { id: 'ledger', text: "Okay. I hear you. That's a lot to carry by yourself." },
+  { id: 'cold-coffee', text: "Leave it here with me. It'll keep till morning." },
 ]
 
 export default function BenchGus({ audioEnabled = true, companion = 'GUS' }) {
