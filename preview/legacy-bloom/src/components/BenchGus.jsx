@@ -44,14 +44,18 @@ const GUS_LINES = [
 // June — grounded warmth, calm cadence, crisp articulation. Never
 // synthetic, preachy, or bubbly. Same structure as Gus's lines so the
 // Bench runtime logic doesn't care which persona is active.
-// Danny's own first-pass words for how June (modeled on Michele) would
-// talk to someone having a rough night, Nov 1, 2026 — not a final
-// polish from Michele herself yet, but his real words, not Claude's.
+// Michele's own final wording, recorded Nov 2, 2026 — Danny was in the
+// room, Jett filed it exactly as she said it. This replaces Danny's
+// Nov 1 first-pass placeholder text; these are Michele's words, not
+// Claude's and not Danny's. Line 'cold-coffee' ends on her actual word,
+// not "tomorrow" and not "tomorrow morning" — Danny asked for it
+// spelled phonetically, "too-mar-rah'", to match how she says it on
+// screen (her recording already carries the real accent either way).
 const JUNE_LINES = [
-  { id: 'greet', text: "Hey, you made it. Sit down, let's just breathe a minute." },
-  { id: 'circuit-breaker', text: "You don't have to fix it tonight. Just tell me what's heavy." },
-  { id: 'ledger', text: "Okay. I hear you. That's a lot to carry by yourself." },
-  { id: 'cold-coffee', text: "Leave it here with me. It'll keep till morning." },
+  { id: 'greet', text: "Well hey sweetheart, you made it, sit down, just take a breath and just relax. Whenever you're ready, I'm here." },
+  { id: 'circuit-breaker', text: "Whenever you're ready, you don't have to fix anything tonight. Just tell me what's going on and what's heavy on your mind. And we'll talk it out." },
+  { id: 'ledger', text: "Well, I hear you, darling. That's a lot for one person to carry. Well, you always have good friends and family here just to take a load off." },
+  { id: 'cold-coffee', text: "Well, there ain't nothing can't wait till too-mar-rah', so just take a load off and talk with me when you're ready." },
 ]
 
 export default function BenchGus({ audioEnabled = true, companion = 'GUS' }) {
