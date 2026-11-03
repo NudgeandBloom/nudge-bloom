@@ -38,7 +38,7 @@ function storeCompanion(id) {
 
 const GREETING = {
   GUS: "Alright. Grab a stool. What's going on today?",
-  JUNE: 'Alright. We’re here. What’s the rhythm today?',
+  JUNE: "Well, alright darling, we're here. What's your rhythm today?",
 }
 
 // Screens: 'door' -> 'sanctuary' (swipe through SANCTUARIES) -> 'bench' (swipe down)
